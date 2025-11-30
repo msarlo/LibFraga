@@ -1,48 +1,29 @@
 export default function Home() {
   return (
-    <main className="container">
-      <h1>LibFraga - Sistema de Biblioteca</h1>
+    <div>
+      <h1>Bem-vindo ao LibFraga</h1>
+      <p style={{ textAlign: 'center', marginTop: '-1.5rem', marginBottom: '3rem', fontSize: '1.2rem', color: '#666' }}>
+        Sistema de Gerenciamento de Biblioteca
+      </p>
 
-      <section>
-        <h2>Funcionalidades do Sistema</h2>
-
-        <div className="feature-section">
-          <h3>1. Usuários</h3>
-          <ul>
-            <li><strong>Administrador:</strong> Pode cadastrar outros usuários</li>
-            <li><strong>Bibliotecário:</strong> Pode realizar todas as ações administrativas</li>
-            <li><strong>Aluno:</strong> Pode consultar seus próprios empréstimos e dados cadastrais</li>
-          </ul>
+      <div className="dashboard-grid">
+        <div className="card">
+          <h3>Total de Livros</h3>
+          <p className="stat">--</p>
         </div>
-
-        <div className="feature-section">
-          <h3>2. Gestão de Livros</h3>
-          <p>Cadastro e gerenciamento do acervo da biblioteca</p>
+        <div className="card">
+          <h3>Empréstimos Ativos</h3>
+          <p className="stat">--</p>
         </div>
-
-        <div className="feature-section">
-          <h3>3. Empréstimos</h3>
-          <p>Sistema de empréstimo de livros para alunos</p>
+        <div className="card">
+          <h3>Usuários Cadastrados</h3>
+          <p className="stat">--</p>
         </div>
-
-        <div className="feature-section">
-          <h3>4. Devoluções</h3>
-          <p>Controle de devoluções com sistema de multas por atraso</p>
+        <div className="card">
+          <h3>Livros em Atraso</h3>
+          <p className="stat">--</p>
         </div>
-
-        <div className="feature-section">
-          <h3>5. Pagamentos</h3>
-          <p>Gestão de pagamentos de multas</p>
-        </div>
-
-        <div className="feature-section">
-          <h3>6. Relatórios</h3>
-          <ul>
-            <li>Livros emprestados por aluno</li>
-            <li>Livros em atraso</li>
-          </ul>
-        </div>
-      </section>
-    </main>
-  )
+      </div>
+    </div>
+  );
 }
