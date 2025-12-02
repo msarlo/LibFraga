@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import BookForm from '../BookForm';
+import BookForm from '../../BookForm';
+
 
 type BookFormPageProps = {
   params: {

@@ -1,11 +1,12 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Book } from '@prisma/client';
+import type { Book } from '../../generated/prisma/client';
+import { isValidIsbn } from '@/lib/isbn';
 
 type BookFormProps = {
-  book?: Book; // Optional book data for editing
+  book?: Book;
 };
 
 export default function BookForm({ book }: BookFormProps) {
@@ -14,6 +15,7 @@ export default function BookForm({ book }: BookFormProps) {
     title: '',
     author: '',
     quantity: 1,
+    isbn: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +28,7 @@ export default function BookForm({ book }: BookFormProps) {
         title: book.title,
         author: book.author,
         quantity: book.quantity,
+        isbn: (book as any).isbn ?? '',
       });
     }
   }, [isEditMode, book]);
@@ -42,7 +45,12 @@ export default function BookForm({ book }: BookFormProps) {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-
+    // Validate ISBN only if provided; backend will generate one otherwise
+    if (formData.isbn && !isValidIsbn(formData.isbn)) {
+      setError('ISBN inválido. Use ISBN-10 ou ISBN-13 válidos, ou deixe em branco para gerar automaticamente.');
+      setIsLoading(false);
+      return;
+    }
     const apiEndpoint = isEditMode ? `/api/books/${book?.id}` : '/api/books';
     const method = isEditMode ? 'PUT' : 'POST';
 
@@ -93,6 +101,17 @@ export default function BookForm({ book }: BookFormProps) {
             value={formData.author}
             onChange={handleChange}
             required
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="isbn">ISBN</label>
+          <input
+            type="text"
+            id="isbn"
+            name="isbn"
+            value={formData.isbn}
+            onChange={handleChange}
+            placeholder="Opcional — será gerado automaticamente se vazio"
           />
         </div>
         <div className="form-group">
