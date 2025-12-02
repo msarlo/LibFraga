@@ -1,9 +1,17 @@
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
+
+const secret = process.env.NEXTAUTH_SECRET;
 
 // GET /api/reports/overdue-books - Report of all overdue books
 export async function GET(request: NextRequest) {
-  // TODO: Add authentication and authorization (ADMIN or BIBLIOTECARIO)
+  const token = await getToken({ req: request, secret });
+
+  if (!token || (token.role !== 'ADMIN' && token.role !== 'BIBLIOTECARIO')) {
+    return new NextResponse(JSON.stringify({ error: 'Acesso proibido' }), { status: 403 });
+  }
+
   try {
     const now = new Date();
 
@@ -15,8 +23,12 @@ export async function GET(request: NextRequest) {
         },
       },
       include: {
-        book: true,
-        user: true, // Include user details to know who has the book
+        book: {
+          select: { id: true, title: true, isbn: true }
+        },
+        user: {
+          select: { id: true, name: true, email: true }
+        },
       },
       orderBy: {
         dueDate: 'asc',
@@ -27,8 +39,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error(error);
     return new NextResponse(
-      JSON.stringify({ error: 'Failed to fetch overdue books report' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Falha ao gerar o relatório de livros em atraso' }),
+      { status: 500 }
     );
   }
 }

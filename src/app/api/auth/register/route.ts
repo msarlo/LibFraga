@@ -1,43 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
+import { getToken } from 'next-auth/jwt';
 
-export async function POST(request: NextRequest) {
+const secret = process.env.NEXTAUTH_SECRET;
+
+async function handler(req: NextRequest) {
+  const token = await getToken({ req, secret });
+
+  // 1. Check if user is authenticated and is an ADMIN
+  if (!token || token.role !== 'ADMIN') {
+    return new NextResponse(JSON.stringify({ error: 'Acesso não autorizado: somente administradores podem registrar novos usuários.' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  if (req.method === 'POST') {
     try {
-        // Only allow admin creation when caller provides valid admin secret
-        const adminSecret = request.headers.get('x-admin-secret') || process.env.ADMIN_SECRET;
-        if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
-            return new NextResponse(JSON.stringify({ error: 'Forbidden: admin credentials required' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
-        }
-        const { name, email, password, role } = await request.json();
-        if (!name || !email || !password) {
-            return new NextResponse(JSON.stringify({ error: 'Nome, email e senha são obrigatórios' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-        }
+      const { name, email, password, role } = await req.json();
 
-        // Basic uniqueness check
-        const existing = await prisma.user.findUnique({ where: { email } });
-        if (existing) {
-            return new NextResponse(JSON.stringify({ error: 'Email já cadastrado' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
-        }
+      // 2. Validate input
+      if (!name || !email || !password || !role) {
+        return new NextResponse(JSON.stringify({ error: 'Nome, email, senha e função são obrigatórios' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
 
-        // Normalize role and enforce allowed values. Default to 'aluno' for regular registrations.
-        const allowedRoles = ['admin', 'bibliotecario', 'aluno'];
-        const roleNormalized = role && typeof role === 'string' && allowedRoles.includes(role.toLowerCase())
-            ? role.toLowerCase()
-            : 'aluno';
+      // 3. Check if user already exists
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return new NextResponse(JSON.stringify({ error: 'Email já cadastrado' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+      }
 
-        const newUser = await prisma.user.create({
-            data: {
-                name,
-                email,
-                password, // NOTE: plaintext for prototype; replace with hashing in production
-                role: roleNormalized,
-            },
-        });
+      // 4. Hash the password
+      const hashedPassword = await bcrypt.hash(password, 10);
 
-        const { password: _p, ...safe } = newUser as any;
-        return new NextResponse(JSON.stringify(safe), { status: 201, headers: { 'Content-Type': 'application/json' } });
+      // 5. Create the new user
+      const newUser = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role, // Role is now provided in the request body
+        },
+      });
+
+      // 6. Return the new user without the password
+      const { password: _, ...userWithoutPassword } = newUser;
+      return new NextResponse(JSON.stringify(userWithoutPassword), { status: 201, headers: { 'Content-Type': 'application/json' } });
+
     } catch (error) {
-        console.error(error);
-        return new NextResponse(JSON.stringify({ error: 'Erro ao cadastrar usuário' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      console.error('Erro ao registrar usuário:', error);
+      return new NextResponse(JSON.stringify({ error: 'Erro interno do servidor ao cadastrar usuário' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
+  } else {
+    return new NextResponse(JSON.stringify({ error: `Método ${req.method} não permitido` }), { status: 405, headers: { 'Content-Type': 'application/json', 'Allow': 'POST' } });
+  }
 }
+
+export { handler as POST };
