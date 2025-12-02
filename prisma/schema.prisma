@@ -1,16 +1,12 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
+  engineType = "library"
 }
 
 datasource db {
   provider = "sqlite"
-}
-
-enum Role {
-  ADMIN
-  BIBLIOTECARIO
-  ALUNO
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -18,7 +14,7 @@ model User {
   name      String
   email     String   @unique
   password  String
-  role      Role     @default(ALUNO)
+  role      String   @default("ALUNO")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   fines     Fine[]

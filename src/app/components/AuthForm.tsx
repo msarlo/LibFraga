@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isValidIsbn } from '@/lib/isbn';
+import { signIn } from 'next-auth/react';
 
 export default function AuthForm() {
     const [loading, setLoading] = useState(false);
@@ -18,19 +18,21 @@ export default function AuthForm() {
         setError(null);
         setLoading(true);
         try {
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+            const result = await signIn('credentials', {
+                redirect: false,
+                email,
+                password,
             });
-            if (!res.ok) {
-                const body = await res.json();
-                throw new Error(body.error || 'Erro ao entrar');
+
+            if (result?.error) {
+                setError('Credenciais inválidas');
+            } else {
+                // on success, navigate to /books (or dashboard)
+                router.push('/books');
+                router.refresh();
             }
-            // on success, navigate to /books (or dashboard)
-            router.push('/books');
         } catch (err: any) {
-            setError(err.message);
+            setError('Erro ao tentar fazer login');
         } finally {
             setLoading(false);
         }
@@ -59,10 +61,6 @@ export default function AuthForm() {
                     <button type="submit" disabled={loading}>{loading ? 'Entrando...' : 'Entrar'}</button>
                 </div>
             </form>
-
-            <p style={{ marginTop: 12, color: '#666' }}>
-                Observe: este é um protótipo — senhas são armazenadas em texto puro. Para produção, implemente hash e tokens.
-            </p>
         </div>
     );
 }

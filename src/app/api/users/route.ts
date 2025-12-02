@@ -8,7 +8,7 @@ const secret = process.env.NEXTAUTH_SECRET;
 export async function GET(request: NextRequest) {
   const token = await getToken({ req: request, secret });
 
-  if (!token || token.role !== 'ADMIN') {
+  if (!token || (token.role !== 'ADMIN' && token.role !== 'BIBLIOTECARIO')) {
     return new NextResponse(
       JSON.stringify({ error: 'Acesso não autorizado' }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }

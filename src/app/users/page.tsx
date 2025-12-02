@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 
 type User = {
     id: string;
@@ -11,28 +13,28 @@ type User = {
 };
 
 export default function UsersPage() {
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const { data: session, status } = useSession();
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
     useEffect(() => {
-        async function init() {
-            try {
-                const meRes = await fetch('/api/auth/me');
-                if (!meRes.ok) {
-                    router.push('/');
-                    return;
-                }
-                const me = await meRes.json();
-                setCurrentUser(me);
-                if (!['admin', 'bibliotecario'].includes(me.role)) {
-                    setError('Acesso negado: você não tem permissão para ver esta página.');
-                    setLoading(false);
-                    return;
-                }
+        if (status === 'loading') return;
 
+        if (status === 'unauthenticated') {
+            router.push('/login');
+            return;
+        }
+
+        const role = session?.user?.role;
+        if (role !== 'ADMIN' && role !== 'BIBLIOTECARIO') {
+            router.push('/'); // Redirect unauthorized users
+            return;
+        }
+
+        async function fetchUsers() {
+            try {
                 const res = await fetch('/api/users');
                 if (!res.ok) throw new Error('Falha ao carregar usuários');
                 const list = await res.json();
@@ -44,35 +46,72 @@ export default function UsersPage() {
             }
         }
 
-        init();
-    }, [router]);
+        fetchUsers();
+    }, [status, session, router]);
 
-    if (loading) return <div>Carregando...</div>;
-    if (error) return <div style={{ color: 'red' }}>{error}</div>;
+    if (status === 'loading' || loading) return <div className="container">Carregando...</div>;
+    if (error) return <div className="container" style={{ color: 'red' }}>{error}</div>;
+
+    const isAdmin = session?.user?.role === 'ADMIN';
 
     return (
         <div>
             <div className="page-header">
-                <h1>Usuários</h1>
+                <h2>Gerenciamento de Usuários</h2>
+                {isAdmin && (
+                    <Link href="/users/register" className="btn btn-primary">
+                        Novo Usuário
+                    </Link>
+                )}
             </div>
 
-            <div className="feature-section">
+            <div className="table-container">
                 <table className="table">
                     <thead>
                         <tr>
                             <th>Nome</th>
                             <th>Email</th>
-                            <th>Role</th>
+                            <th>Função</th>
+                            {isAdmin && <th>Ações</th>}
                         </tr>
                     </thead>
                     <tbody>
-                        {users.map((u) => (
-                            <tr key={u.id}>
-                                <td>{u.name}</td>
-                                <td>{u.email}</td>
-                                <td>{u.role}</td>
+                        {users.length > 0 ? (
+                            users.map((u) => (
+                                <tr key={u.id}>
+                                    <td>
+                                        <Link href={`/users/${u.id}`} style={{ textDecoration: 'none', color: 'inherit', fontWeight: 'bold' }}>
+                                            {u.name}
+                                        </Link>
+                                    </td>
+                                    <td>{u.email}</td>
+                                    <td>{u.role}</td>
+                                    {isAdmin && (
+                                        <td>
+                                            {/* Placeholder for edit/delete actions if needed */}
+                                            <button 
+                                                className="btn btn-danger" 
+                                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.9rem' }}
+                                                onClick={async () => {
+                                                    if(confirm('Tem certeza que deseja excluir este usuário?')) {
+                                                        await fetch(`/api/users/${u.id}`, { method: 'DELETE' });
+                                                        setUsers(users.filter(user => user.id !== u.id));
+                                                    }
+                                                }}
+                                            >
+                                                Excluir
+                                            </button>
+                                        </td>
+                                    )}
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={isAdmin ? 4 : 3} style={{ textAlign: 'center' }}>
+                                    Nenhum usuário encontrado.
+                                </td>
                             </tr>
-                        ))}
+                        )}
                     </tbody>
                 </table>
             </div>

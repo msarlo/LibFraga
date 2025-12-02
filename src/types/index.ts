@@ -1,6 +1,6 @@
 // Re-export Prisma types
-import { Prisma } from '@/generated/prisma/client';
-export type { User, Book, Loan, Fine } from '@/generated/prisma/client';
+import { Prisma } from '@/generated/prisma';
+export type { User, Book, Loan, Fine } from '@/generated/prisma';
 // export type UserRole = Prisma.UserRole;
 // export type LoanStatus = Prisma.LoanStatus;
 

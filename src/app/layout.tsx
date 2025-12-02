@@ -1,29 +1,12 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import './globals.css';
+import Provider from './components/Provider';
+import Header from './components/Header';
 
 export const metadata: Metadata = {
   title: 'LibFraga - Sistema de Biblioteca',
   description: 'Sistema de gerenciamento de biblioteca',
 };
-
-function Header() {
-  return (
-    <header className="header">
-      <nav className="nav">
-        <Link href="/" className="logo">
-          LibFraga
-        </Link>
-        <div className="nav-links">
-          <Link href="/">Home</Link>
-          <Link href="/books">Livros</Link>
-          <Link href="/users">Usuários</Link>
-          <Link href="/loans">Empréstimos</Link>
-        </div>
-      </nav>
-    </header>
-  );
-}
 
 export default function RootLayout({
   children,
@@ -33,8 +16,10 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body>
-        <Header />
-        <main className="container">{children}</main>
+        <Provider>
+          <Header />
+          <main className="container">{children}</main>
+        </Provider>
       </body>
     </html>
   );
