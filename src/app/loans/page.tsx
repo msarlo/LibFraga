@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,12 +15,30 @@ interface Loan {
   status: string;
 }
 
+function getStatusBadge(loan: Loan) {
+  if (loan.returnDate) {
+    return <span className="badge badge-success">Devolvido</span>;
+  }
+  if (new Date(loan.dueDate) < new Date()) {
+    return <span className="badge badge-danger">Atrasado</span>;
+  }
+  return <span className="badge badge-warning">Em andamento</span>;
+}
+
 export default function LoansPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Filtros
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loanDateFrom, setLoanDateFrom] = useState("");
+  const [loanDateTo, setLoanDateTo] = useState("");
+  const [dueDateFrom, setDueDateFrom] = useState("");
+  const [dueDateTo, setDueDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
     if (status === "loading") return;
@@ -30,10 +48,8 @@ export default function LoansPage() {
     }
 
     if (session?.user?.role === "ALUNO") {
-      if (session?.user?.role === "ALUNO") {
-        router.push("/");
-        return;
-      }
+      router.push("/");
+      return;
     }
 
     fetchLoans();
@@ -51,6 +67,41 @@ export default function LoansPage() {
       setLoading(false);
     }
   };
+
+  const filteredLoans = useMemo(() => {
+    return loans.filter((loan) => {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch =
+        !searchTerm.trim() ||
+        loan.book.title.toLowerCase().includes(term) ||
+        loan.user.name.toLowerCase().includes(term);
+
+      // Filtro de data de empréstimo
+      const loanDate = new Date(loan.loanDate);
+      const matchesLoanDateFrom = !loanDateFrom || loanDate >= new Date(loanDateFrom);
+      const matchesLoanDateTo = !loanDateTo || loanDate <= new Date(loanDateTo + "T23:59:59");
+
+      // Filtro de data de devolução prevista
+      const dueDate = new Date(loan.dueDate);
+      const matchesDueDateFrom = !dueDateFrom || dueDate >= new Date(dueDateFrom);
+      const matchesDueDateTo = !dueDateTo || dueDate <= new Date(dueDateTo + "T23:59:59");
+
+      // Filtro de status
+      let matchesStatus = true;
+      if (statusFilter) {
+        if (statusFilter === "RETURNED") {
+          matchesStatus = !!loan.returnDate;
+        } else if (statusFilter === "OVERDUE") {
+          matchesStatus = !loan.returnDate && new Date(loan.dueDate) < new Date();
+        } else if (statusFilter === "ACTIVE") {
+          matchesStatus = !loan.returnDate && new Date(loan.dueDate) >= new Date();
+        }
+      }
+
+      return matchesSearch && matchesLoanDateFrom && matchesLoanDateTo &&
+             matchesDueDateFrom && matchesDueDateTo && matchesStatus;
+    });
+  }, [loans, searchTerm, loanDateFrom, loanDateTo, dueDateFrom, dueDateTo, statusFilter]);
 
   const handleReturn = async (id: string) => {
     if (!confirm("Confirmar devolução do livro?")) return;
@@ -71,101 +122,163 @@ export default function LoansPage() {
     }
   };
 
-  if (status === "loading" || loading)
-    return <div className="container">Carregando...</div>;
+  const clearFilters = () => {
+    setSearchTerm("");
+    setLoanDateFrom("");
+    setLoanDateTo("");
+    setDueDateFrom("");
+    setDueDateTo("");
+    setStatusFilter("");
+  };
+
+  const hasActiveFilters = searchTerm || loanDateFrom || loanDateTo || dueDateFrom || dueDateTo || statusFilter;
+
+  if (status === "loading" || loading) {
+    return (
+      <div className="loading">
+        <div className="loading-spinner"></div>
+        <span>Carregando empréstimos...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="container">
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "2rem",
-        }}
-      >
+    <div>
+      <div className="page-header">
         <h1>Gerenciamento de Empréstimos</h1>
         <Link href="/loans/new" className="btn btn-primary">
           Novo Empréstimo
         </Link>
       </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="card-grid" style={{ gridTemplateColumns: "1fr" }}>
-        {" "}
-        {/* List view style */}
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="card mb-3">
+        <div className="flex flex-col gap-2">
+          {/* Primeira linha: pesquisa e status */}
+          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Pesquisar por livro ou aluno..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input"
+              style={{ maxWidth: '300px' }}
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="input"
+              style={{ maxWidth: '180px' }}
+            >
+              <option value="">Todos os status</option>
+              <option value="ACTIVE">Em andamento</option>
+              <option value="OVERDUE">Atrasado</option>
+              <option value="RETURNED">Devolvido</option>
+            </select>
+          </div>
+
+          {/* Segunda linha: datas de empréstimo */}
+          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+            <span className="text-muted" style={{ minWidth: '140px' }}>Data Empréstimo:</span>
+            <input
+              type="date"
+              value={loanDateFrom}
+              onChange={(e) => setLoanDateFrom(e.target.value)}
+              className="input"
+              style={{ maxWidth: '160px' }}
+            />
+            <span className="text-muted">até</span>
+            <input
+              type="date"
+              value={loanDateTo}
+              onChange={(e) => setLoanDateTo(e.target.value)}
+              className="input"
+              style={{ maxWidth: '160px' }}
+            />
+          </div>
+
+          {/* Terceira linha: datas de devolução */}
+          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+            <span className="text-muted" style={{ minWidth: '140px' }}>Devolução Prevista:</span>
+            <input
+              type="date"
+              value={dueDateFrom}
+              onChange={(e) => setDueDateFrom(e.target.value)}
+              className="input"
+              style={{ maxWidth: '160px' }}
+            />
+            <span className="text-muted">até</span>
+            <input
+              type="date"
+              value={dueDateTo}
+              onChange={(e) => setDueDateTo(e.target.value)}
+              className="input"
+              style={{ maxWidth: '160px' }}
+            />
+          </div>
+
+          {/* Contador e limpar filtros */}
+          {hasActiveFilters && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted">
+                {filteredLoans.length} de {loans.length} empréstimos
+              </span>
+              <button
+                onClick={clearFilters}
+                className="btn btn-secondary btn-sm"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="table-container">
+        <table className="table">
           <thead>
-            <tr style={{ textAlign: "left", borderBottom: "2px solid #eee" }}>
-              <th style={{ padding: "1rem" }}>Livro</th>
-              <th style={{ padding: "1rem" }}>Aluno</th>
-              <th style={{ padding: "1rem" }}>Data Empréstimo</th>
-              <th style={{ padding: "1rem" }}>Data Devolução Prevista</th>
-              <th style={{ padding: "1rem" }}>Status</th>
-              <th style={{ padding: "1rem" }}>Ações</th>
+            <tr>
+              <th>Livro</th>
+              <th>Aluno</th>
+              <th>Data Empréstimo</th>
+              <th>Devolução Prevista</th>
+              <th>Status</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {loans.map((loan) => (
-              <tr key={loan.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: "1rem" }}>{loan.book.title}</td>
-                <td style={{ padding: "1rem" }}>{loan.user.name}</td>
-                <td style={{ padding: "1rem" }}>
-                  {new Date(loan.loanDate).toLocaleDateString("pt-BR")}
-                </td>
-                <td style={{ padding: "1rem" }}>
-                  {new Date(loan.dueDate).toLocaleDateString("pt-BR")}
-                </td>
-                <td style={{ padding: "1rem" }}>
-                  <span
-                    style={{
-                      padding: "0.25rem 0.5rem",
-                      borderRadius: "4px",
-                      backgroundColor: loan.returnDate
-                        ? "#d4edda"
-                        : new Date(loan.dueDate) < new Date()
-                        ? "#f8d7da"
-                        : "#fff3cd",
-                      color: loan.returnDate
-                        ? "#155724"
-                        : new Date(loan.dueDate) < new Date()
-                        ? "#721c24"
-                        : "#856404",
-                      fontSize: "0.875rem",
-                    }}
-                  >
-                    {loan.returnDate
-                      ? "Devolvido"
-                      : new Date(loan.dueDate) < new Date()
-                      ? "Atrasado"
-                      : "Em andamento"}
-                  </span>
-                </td>
-                <td style={{ padding: "1rem" }}>
-                  {!loan.returnDate && (
-                    <button
-                      onClick={() => handleReturn(loan.id)}
-                      className="btn btn-secondary"
-                      style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem" }}
-                    >
-                      Devolver
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {loans.length === 0 && (
+            {filteredLoans.length > 0 ? (
+              filteredLoans.map((loan) => (
+                <tr key={loan.id}>
+                  <td>{loan.book.title}</td>
+                  <td>{loan.user.name}</td>
+                  <td>{new Date(loan.loanDate).toLocaleDateString("pt-BR")}</td>
+                  <td>{new Date(loan.dueDate).toLocaleDateString("pt-BR")}</td>
+                  <td>{getStatusBadge(loan)}</td>
+                  <td>
+                    {!loan.returnDate && (
+                      <button
+                        onClick={() => handleReturn(loan.id)}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Devolver
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            ) : (
               <tr>
-                <td
-                  colSpan={6}
-                  style={{
-                    padding: "2rem",
-                    textAlign: "center",
-                    color: "#666",
-                  }}
-                >
-                  Nenhum empréstimo encontrado.
+                <td colSpan={6}>
+                  <div className="empty-state">
+                    <div className="empty-state-icon">📚</div>
+                    <p>
+                      {hasActiveFilters
+                        ? "Nenhum empréstimo encontrado com os filtros aplicados."
+                        : "Nenhum empréstimo cadastrado."}
+                    </p>
+                  </div>
                 </td>
               </tr>
             )}

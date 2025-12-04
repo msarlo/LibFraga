@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import BookActions from './BookActions';
@@ -18,6 +18,7 @@ export default function BooksPage() {
   const { data: session } = useSession();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const isAdmin = session?.user?.role === 'ADMIN';
   const isLibrarian = session?.user?.role === 'BIBLIOTECARIO';
@@ -43,8 +44,24 @@ export default function BooksPage() {
     }
   };
 
+  const filteredBooks = useMemo(() => {
+    if (!searchTerm.trim()) return books;
+
+    const term = searchTerm.toLowerCase();
+    return books.filter(
+      (book) =>
+        book.title.toLowerCase().includes(term) ||
+        book.author.toLowerCase().includes(term)
+    );
+  }, [books, searchTerm]);
+
   if (loading) {
-    return <div className="loading">Carregando livros...</div>;
+    return (
+      <div className="loading">
+        <div className="loading-spinner"></div>
+        <span>Carregando livros...</span>
+      </div>
+    );
   }
 
   return (
@@ -56,6 +73,24 @@ export default function BooksPage() {
             Adicionar Livro
           </Link>
         )}
+      </div>
+
+      <div className="card mb-3">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Pesquisar por título ou autor..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input"
+            style={{ maxWidth: '400px' }}
+          />
+          {searchTerm && (
+            <span className="text-muted">
+              {filteredBooks.length} de {books.length} livros
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="table-container">
@@ -79,8 +114,8 @@ export default function BooksPage() {
             </tr>
           </thead>
           <tbody>
-            {books.length > 0 ? (
-              books.map((book) => (
+            {filteredBooks.length > 0 ? (
+              filteredBooks.map((book) => (
                 <tr 
                   key={book.id} 
                   className={book.available === 0 ? 'book-unavailable' : ''}
@@ -100,8 +135,15 @@ export default function BooksPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={canManage ? 6 : 5} style={{ textAlign: 'center' }}>
-                  Nenhum livro encontrado.
+                <td colSpan={canManage ? 6 : 5}>
+                  <div className="empty-state">
+                    <div className="empty-state-icon">📚</div>
+                    <p>
+                      {searchTerm
+                        ? `Nenhum livro encontrado para "${searchTerm}"`
+                        : 'Nenhum livro cadastrado.'}
+                    </p>
+                  </div>
                 </td>
               </tr>
             )}

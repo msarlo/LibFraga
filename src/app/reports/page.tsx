@@ -25,10 +25,21 @@ interface StudentHistory {
   }[];
 }
 
+function getStatusBadge(status: string) {
+  switch (status) {
+    case 'RETURNED':
+      return <span className="badge badge-success">Devolvido</span>;
+    case 'OVERDUE':
+      return <span className="badge badge-danger">Atrasado</span>;
+    default:
+      return <span className="badge badge-info">Ativo</span>;
+  }
+}
+
 export default function ReportsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  
+
   const [overdueLoans, setOverdueLoans] = useState<OverdueLoan[]>([]);
   const [studentHistory, setStudentHistory] = useState<StudentHistory[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,10 +60,9 @@ export default function ReportsPage() {
     fetchData();
   }, [status, session, router]);
 
-  // Re-fetch when search term changes (with debounce could be better, but simple for now)
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.role !== 'ALUNO') {
-        fetchStudentHistory();
+      fetchStudentHistory();
     }
   }, [searchTerm]);
 
@@ -62,7 +72,7 @@ export default function ReportsPage() {
       if (!overdueRes.ok) throw new Error('Falha ao carregar pendências');
       const overdueData = await overdueRes.json();
       setOverdueLoans(overdueData);
-      
+
       await fetchStudentHistory();
     } catch (err: any) {
       setError(err.message);
@@ -73,98 +83,124 @@ export default function ReportsPage() {
 
   const fetchStudentHistory = async () => {
     try {
-        const res = await fetch(`/api/reports/loans-by-student?search=${encodeURIComponent(searchTerm)}`);
-        if (res.ok) {
-            const data = await res.json();
-            setStudentHistory(data);
-        }
+      const res = await fetch(`/api/reports/loans-by-student?search=${encodeURIComponent(searchTerm)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStudentHistory(data);
+      }
     } catch (error) {
-        console.error("Error fetching student history", error);
+      console.error("Error fetching student history", error);
     }
   };
 
-  if (status === 'loading' || loading) return <div className="container">Carregando...</div>;
+  if (status === 'loading' || loading) {
+    return (
+      <div className="loading">
+        <div className="loading-spinner"></div>
+        <span>Carregando relatórios...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="container">
+    <div>
       <h1>Relatórios</h1>
-      
-      {error && <p style={{ color: 'red' }}>{error}</p>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', marginTop: '2rem' }}>
-        
+      {error && <div className="alert alert-error">{error}</div>}
+
+      <div className="flex flex-col gap-3 mt-3">
+
         {/* Overdue Books Section */}
-        <div className="card" style={{ textAlign: 'left' }}>
-          <h2>Livros em Atraso (Pendências)</h2>
+        <div className="card">
+          <h2 className="mb-2">Livros em Atraso (Pendências)</h2>
           {overdueLoans.length === 0 ? (
-            <p>Nenhuma pendência encontrada.</p>
+            <div className="empty-state">
+              <div className="empty-state-icon">✓</div>
+              <p>Nenhuma pendência encontrada.</p>
+            </div>
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              {overdueLoans.map((loan) => (
-                <li key={loan.id} style={{ padding: '1rem', borderBottom: '1px solid #eee' }}>
-                  <strong>{loan.user.name}</strong> ({loan.user.email})<br/>
-                  <span style={{ color: '#721c24', fontWeight: 'bold' }}>Atrasado: {loan.book.title}</span><br/>
-                  <small>Vencimento: {new Date(loan.dueDate).toLocaleDateString('pt-BR')}</small>
-                </li>
-              ))}
-            </ul>
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Aluno</th>
+                    <th>Livro</th>
+                    <th>Vencimento</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overdueLoans.map((loan) => (
+                    <tr key={loan.id}>
+                      <td>
+                        <strong>{loan.user.name}</strong>
+                        <br />
+                        <span className="text-muted">{loan.user.email}</span>
+                      </td>
+                      <td>{loan.book.title}</td>
+                      <td>{new Date(loan.dueDate).toLocaleDateString('pt-BR')}</td>
+                      <td><span className="badge badge-danger">Atrasado</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
         {/* Student History Section */}
-        <div className="card" style={{ textAlign: 'left' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2>Histórico de Empréstimos por Aluno</h2>
-            <input 
-                type="text" 
-                placeholder="Pesquisar aluno..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', width: '250px' }}
+        <div className="card">
+          <div className="page-header mb-2">
+            <h2 className="mb-0">Histórico de Empréstimos por Aluno</h2>
+            <input
+              type="text"
+              placeholder="Pesquisar aluno..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input"
+              style={{ maxWidth: '250px' }}
             />
           </div>
-          
+
           {studentHistory.length === 0 ? (
-            <p>Nenhum aluno encontrado.</p>
+            <div className="empty-state">
+              <div className="empty-state-icon">👤</div>
+              <p>Nenhum aluno encontrado.</p>
+            </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="flex flex-col gap-2">
               {studentHistory.map((student) => (
-                <div key={student.id} style={{ border: '1px solid #eee', borderRadius: '8px', padding: '1rem', backgroundColor: '#fafafa' }}>
-                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>{student.name} <small style={{ fontSize: '0.9rem', color: '#666', fontWeight: 'normal' }}>({student.email})</small></h3>
-                  
+                <div key={student.id} className="card" style={{ backgroundColor: 'var(--color-gray-50)' }}>
+                  <h3 className="mb-1">
+                    {student.name}
+                    <span className="text-muted" style={{ fontWeight: 'normal', fontSize: '0.9rem' }}> ({student.email})</span>
+                  </h3>
+
                   {student.loans.length === 0 ? (
-                    <p style={{ fontStyle: 'italic', color: '#888', fontSize: '0.9rem' }}>Nenhum empréstimo registrado.</p>
+                    <p className="text-muted" style={{ fontStyle: 'italic' }}>Nenhum empréstimo registrado.</p>
                   ) : (
-                    <table className="table" style={{ fontSize: '0.9rem' }}>
+                    <div className="table-container">
+                      <table className="table">
                         <thead>
-                            <tr>
-                                <th>Livro</th>
-                                <th>Data Empréstimo</th>
-                                <th>Data Devolução</th>
-                                <th>Status</th>
-                            </tr>
+                          <tr>
+                            <th>Livro</th>
+                            <th>Data Empréstimo</th>
+                            <th>Data Devolução</th>
+                            <th>Status</th>
+                          </tr>
                         </thead>
                         <tbody>
-                            {student.loans.map(loan => (
-                                <tr key={loan.id}>
-                                    <td>{loan.book.title}</td>
-                                    <td>{new Date(loan.loanDate).toLocaleDateString('pt-BR')}</td>
-                                    <td>{loan.returnDate ? new Date(loan.returnDate).toLocaleDateString('pt-BR') : '-'}</td>
-                                    <td>
-                                        <span style={{ 
-                                            padding: '2px 6px', 
-                                            borderRadius: '4px', 
-                                            fontSize: '0.8rem',
-                                            backgroundColor: loan.status === 'RETURNED' ? '#d4edda' : loan.status === 'OVERDUE' ? '#f8d7da' : '#cce5ff',
-                                            color: loan.status === 'RETURNED' ? '#155724' : loan.status === 'OVERDUE' ? '#721c24' : '#004085'
-                                        }}>
-                                            {loan.status === 'RETURNED' ? 'Devolvido' : loan.status === 'OVERDUE' ? 'Atrasado' : 'Ativo'}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
+                          {student.loans.map(loan => (
+                            <tr key={loan.id}>
+                              <td>{loan.book.title}</td>
+                              <td>{new Date(loan.loanDate).toLocaleDateString('pt-BR')}</td>
+                              <td>{loan.returnDate ? new Date(loan.returnDate).toLocaleDateString('pt-BR') : '-'}</td>
+                              <td>{getStatusBadge(loan.status)}</td>
+                            </tr>
+                          ))}
                         </tbody>
-                    </table>
+                      </table>
+                    </div>
                   )}
                 </div>
               ))}

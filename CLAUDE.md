@@ -4,102 +4,112 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LibFraga is a library management system built with Next.js 14, TypeScript, and Prisma ORM with SQLite. The system manages users (Admin, Bibliotecário, Aluno), books, loans, fines, and provides reporting capabilities.
+LibFraga is a library management system built with Next.js 14, TypeScript, Prisma ORM with SQLite, and NextAuth.js for authentication. The system manages users (ADMIN, BIBLIOTECARIO, ALUNO), books, loans, fines, and provides reporting capabilities.
 
 ## Development Commands
 
-### Running the Application
 ```bash
-npm run dev          # Start development server on http://localhost:3000
-npm run build        # Build for production
-npm start            # Start production server
+npm run dev              # Start development server on http://localhost:3000
+npm run build            # Build for production
+npm start                # Start production server
 ```
 
 ### Database Operations
+
 ```bash
-npm run prisma:generate  # Generate Prisma Client after schema changes
-npm run prisma:migrate   # Create and apply database migrations
-npm run prisma:studio    # Open Prisma Studio (visual database editor)
+npm run db:generate      # Generate Prisma Client after schema changes
+npm run db:migrate       # Create and apply database migrations
+npm run db:push          # Push schema without migration
+npm run db:studio        # Open Prisma Studio (visual database editor)
+npm run db:seed          # Run seed script (creates test users)
+npm run db:reset         # Reset database with confirmation
+npm run db:reset:force   # Force reset + seed (no confirmation)
+npm run db:setup         # Full setup: generate + push + seed
 ```
 
-### Direct Prisma Commands
-```bash
-npx prisma migrate dev --name <migration_name>  # Create named migration
-npx prisma db push                              # Push schema without migration
-npx prisma generate                             # Regenerate Prisma Client
-```
+### Test Users (after seeding)
+
+| Email | Password | Role |
+|-------|----------|------|
+| admin@teste.com | 123456 | ADMIN |
+| bibliotecario@teste.com | 123456 | BIBLIOTECARIO |
+| aluno@teste.com | 123456 | ALUNO |
 
 ## Architecture
 
-### Database Schema (Prisma + SQLite)
+### Authentication (NextAuth.js)
 
-**Key Models:**
-- **User**: Roles are ADMIN, BIBLIOTECARIO, or ALUNO. Only admins can create users. Bibliotecários and admins have full access; alunos can only view their own loans and profile.
-- **Book**: Tracks both total `quantity` and `available` count
-- **Loan**: Status can be ACTIVE, RETURNED, or OVERDUE. Links to both User and Book
-- **Fine**: One-to-one relationship with Loan. Tracks payment status
+- Uses `CredentialsProvider` with bcrypt password hashing
+- JWT strategy for sessions
+- Custom login page at `/login`
+- Session includes `user.id` and `user.role`
+- Type extensions in `src/types/next-auth.d.ts`
 
-**Important Relationships:**
-- Each Loan can have at most one Fine (1:1)
-- Users and Books have many Loans (1:N)
-- Fines reference both Loan and User
+### Middleware Protection
 
-### Prisma Client Location
+Protected routes defined in `src/middleware.ts`:
+- `/api/users/*`, `/api/books/*`, `/api/loans/*`, `/api/fines/*`, `/api/reports/*`
+- `/users/*`, `/books/*`
 
-The Prisma Client is generated to `src/generated/prisma` (not the default location). Always import from:
+### Prisma Configuration
+
+The Prisma Client is generated to `src/generated/prisma`. Always import from:
 ```typescript
 import { PrismaClient } from '@/generated/prisma'
 ```
 
-Use the singleton instance from `src/lib/prisma.ts`:
+Use the singleton instance:
 ```typescript
 import { prisma } from '@/lib/prisma'
 ```
 
-### Type System
+**Important**: The `prisma.ts` singleton uses `path.resolve(process.cwd(), 'prisma', 'dev.db')` for the database path to avoid relative path issues with the generated client.
 
-- Prisma types are re-exported from `src/types/index.ts`
-- DTOs (Data Transfer Objects) for API operations are defined in `src/types/index.ts`
-- Use `CreateUserDTO`, `CreateBookDTO`, `CreateLoanDTO` for input validation
+### Database Schema
 
-### Application Structure
+**Models:**
+- **User**: Roles are ADMIN, BIBLIOTECARIO, or ALUNO (default)
+- **Book**: Tracks `quantity` and `available` count
+- **Loan**: Status can be ACTIVE, RETURNED, or OVERDUE
+- **Fine**: One-to-one with Loan, tracks payment status
+
+### API Routes Structure
 
 ```
-src/
-├── app/              # Next.js 14 App Router pages
-│   ├── layout.tsx    # Root layout
-│   ├── page.tsx      # Home page
-│   └── globals.css   # Global styles
-├── components/       # Reusable React components
-├── lib/              # Utility functions and configurations
-│   └── prisma.ts     # Prisma Client singleton
-├── types/            # TypeScript types and DTOs
-└── generated/        # Auto-generated Prisma Client (gitignored)
-    └── prisma/
+src/app/api/
+├── auth/
+│   ├── [...nextauth]/route.ts  # NextAuth handler
+│   ├── login/route.ts          # Legacy login endpoint
+│   ├── register/route.ts
+│   └── me/route.ts
+├── books/
+├── users/
+├── loans/
+├── fines/
+└── reports/
+    ├── loans-by-student/
+    ├── overdue-books/
+    └── popular-books/
 ```
 
 ### Business Rules
 
-1. **User Management**: Only ADMIN role can create new users
-2. **Loan System**: When a loan is created, decrement Book.available; when returned, increment it
-3. **Overdue Detection**: Loans with `returnDate = null` and `dueDate < now()` should have status OVERDUE
-4. **Fines**: Generated automatically for overdue loans. Track payment separately
-5. **Reports**:
-   - Loans per student: Filter by userId
-   - Overdue books: Filter by status = OVERDUE
+1. **User Management**: Only ADMIN can create new users
+2. **Loan System**: Decrement `Book.available` on loan creation; increment on return
+3. **Overdue Detection**: Loans with `returnDate = null` and `dueDate < now()` are OVERDUE
+4. **Fines**: Auto-generated for overdue loans
 
 ### Environment Variables
 
-Database connection is configured in `.env`:
 ```
 DATABASE_URL="file:./dev.db"
+NEXTAUTH_SECRET="your-secret-key"
+NEXTAUTH_URL="http://localhost:3000"
 ```
-
-The database file is located at `prisma/dev.db` (gitignored).
 
 ## Important Notes
 
-- This project uses Prisma v7, which moved datasource URLs from schema to `prisma.config.ts`
-- The database uses SQLite, so UUID support requires the `@default(uuid())` attribute
-- Prisma Client output directory is customized to `src/generated/prisma`
+- Passwords are hashed with bcrypt (10 rounds)
+- SQLite database at `prisma/dev.db` (gitignored)
 - TypeScript path alias `@/*` maps to `src/*`
+- Prisma Client output is customized to `src/generated/prisma`

@@ -37,50 +37,34 @@ export default function AuthForm() {
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 480,
-        margin: "2rem auto",
-        padding: "1.5rem",
-        border: "1px solid #eee",
-        borderRadius: 8,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: "1rem",
-        }}
-      >
-        <h2 style={{ margin: 0 }}>Entrar</h2>
-      </div>
+    <div>
+      <h2 className="mb-2">Entrar</h2>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <div className="alert alert-error">{error}</div>}
 
       <form onSubmit={handleLogin}>
-        <div style={{ marginBottom: 8 }}>
-          <label>Email</label>
+        <div className="form-group">
+          <label htmlFor="email">Email</label>
           <input
             type="email"
+            id="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{ width: "100%" }}
           />
         </div>
-        <div style={{ marginBottom: 8 }}>
-          <label>Senha</label>
+        <div className="form-group">
+          <label htmlFor="password">Senha</label>
           <input
             type="password"
+            id="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            style={{ width: "100%" }}
           />
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button type="submit" disabled={loading}>
+        <div className="form-actions">
+          <button type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? "Entrando..." : "Entrar"}
           </button>
         </div>
