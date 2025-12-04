@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { isValidIsbn } from '@/lib/isbn';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { generateIsbn13, isValidIsbn } from "@/lib/isbn";
 
 type Book = {
   id: string;
@@ -21,12 +21,12 @@ type BookFormProps = {
 export default function BookForm({ book }: BookFormProps) {
   const router = useRouter();
   const { data: session, status } = useSession();
-  
+
   const [formData, setFormData] = useState({
-    title: '',
-    author: '',
+    title: "",
+    author: "",
     quantity: 1,
-    isbn: '',
+    isbn: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,12 +34,12 @@ export default function BookForm({ book }: BookFormProps) {
   const isEditMode = Boolean(book);
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    } else if (status === 'authenticated') {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    } else if (status === "authenticated") {
       const role = session?.user?.role;
-      if (role !== 'ADMIN' && role !== 'BIBLIOTECARIO') {
-        router.push('/books'); // Redirect unauthorized users
+      if (role !== "ADMIN" && role !== "BIBLIOTECARIO") {
+        router.push("/books");
       }
     }
   }, [status, session, router]);
@@ -50,48 +50,59 @@ export default function BookForm({ book }: BookFormProps) {
         title: book.title,
         author: book.author,
         quantity: book.quantity,
-        isbn: book.isbn ?? '',
+        isbn: book.isbn ?? "",
       });
     }
   }, [isEditMode, book]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'number' ? parseInt(value, 10) : value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: type === "number" ? parseInt(value, 10) : value, }));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    
+
+    if (!formData.isbn) {
+      try {
+        const isbnGerado = generateIsbn13();
+        isValidIsbn(isbnGerado);
+        formData.isbn = isbnGerado;
+      } catch (error) {
+        setError("Falha ao gerar  o ISBN-13 automático.");
+        setIsLoading(false);
+        return;
+      }
+    }
+
     if (formData.isbn && !isValidIsbn(formData.isbn)) {
-      setError('ISBN inválido. Use ISBN-10 ou ISBN-13 válidos, ou deixe em branco para gerar automaticamente.');
+      setError(
+        "ISBN inválido. Use ISBN-10 ou ISBN-13 válidos, ou deixe em branco para gerar automaticamente."
+      );
       setIsLoading(false);
       return;
     }
-    
-    const apiEndpoint = isEditMode ? `/api/books/${book?.id}` : '/api/books';
-    const method = isEditMode ? 'PUT' : 'POST';
+
+    const apiEndpoint = isEditMode ? `/api/books/${book?.id}` : "/api/books";
+    const method = isEditMode ? "PUT" : "POST";
 
     try {
       const res = await fetch(apiEndpoint, {
         method: method,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
       });
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || 'Algo deu errado');
+        throw new Error(errorData.error || "Algo deu errado");
       }
 
-      router.push('/books');
+      router.push("/books");
       router.refresh();
     } catch (err: any) {
       setError(err.message);
@@ -100,7 +111,7 @@ export default function BookForm({ book }: BookFormProps) {
     }
   };
 
-  if (status === 'loading') return <p>Carregando...</p>;
+  if (status === "loading") return <p>Carregando...</p>;
 
   return (
     <div className="form-container">
@@ -151,23 +162,26 @@ export default function BookForm({ book }: BookFormProps) {
           />
         </div>
 
-        {error && <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
+        {error && <p style={{ color: "red", marginBottom: "1rem" }}>{error}</p>}
 
         <div className="form-actions">
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => router.push('/books')}
+            onClick={() => router.push("/books")}
             disabled={isLoading}
           >
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primary" disabled={isLoading}>
-            {isLoading ? 'Salvando...' : 'Salvar Livro'}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={isLoading}
+          >
+            {isLoading ? "Salvando..." : "Salvar Livro"}
           </button>
         </div>
       </form>
     </div>
   );
 }
-

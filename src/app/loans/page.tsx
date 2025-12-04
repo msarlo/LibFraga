@@ -1,9 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import StatusBadge from "../components/StatusBadge";
+import LoadingState from "../components/LoadingState";
+import EmptyState from "../components/EmptyState";
+import PageHeader from "../components/PageHeader";
 
 interface Loan {
   id: string;
@@ -22,31 +25,24 @@ export default function LoansPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Filtros
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loanDateFrom, setLoanDateFrom] = useState("");
+  const [loanDateTo, setLoanDateTo] = useState("");
+  const [dueDateFrom, setDueDateFrom] = useState("");
+  const [dueDateTo, setDueDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
   useEffect(() => {
-    if (status === 'loading') return;
-    if (status === 'unauthenticated') {
-      router.push('/login');
+    if (status === "loading") return;
+    if (status === "unauthenticated") {
+      router.push("/login");
       return;
     }
-    
-    // Only Admin and Librarian can manage loans
-    if (session?.user?.role === 'ALUNO') {
-        // Students might see their own loans, but for now let's restrict the main management page
-        // Or we could filter by user if it's a student. 
-        // The requirement says "Gerenciamento de Empréstimos", usually for staff.
-        // Let's assume this page is for staff to see ALL loans.
-        // If we want students to see their loans, we might do that in a profile page or a filtered view.
-        // For now, let's redirect students or show a message.
-        // Actually, the prompt says "Students view only". Maybe they can view their loans here?
-        // Let's fetch all loans for now, the API might filter or we filter here.
-        // But usually "Manage Loans" is for staff.
-        // Let's stick to Staff for this page for now, or handle the "Student view" later.
-        // Let's allow everyone to see, but maybe filter for students?
-        // The API /api/loans returns all loans. It might be better to restrict this page to staff.
-        if (session?.user?.role === 'ALUNO') {
-             router.push('/'); // Redirect students to home for now
-             return;
-        }
+
+    if (session?.user?.role === "ALUNO") {
+      router.push("/");
+      return;
     }
 
     fetchLoans();
@@ -54,8 +50,8 @@ export default function LoansPage() {
 
   const fetchLoans = async () => {
     try {
-      const res = await fetch('/api/loans');
-      if (!res.ok) throw new Error('Falha ao carregar empréstimos');
+      const res = await fetch("/api/loans");
+      if (!res.ok) throw new Error("Falha ao carregar empréstimos");
       const data = await res.json();
       setLoans(data);
     } catch (err: any) {
@@ -65,90 +61,211 @@ export default function LoansPage() {
     }
   };
 
+  const filteredLoans = useMemo(() => {
+    return loans.filter((loan) => {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch =
+        !searchTerm.trim() ||
+        loan.book.title.toLowerCase().includes(term) ||
+        loan.user.name.toLowerCase().includes(term);
+
+      // Filtro de data de empréstimo
+      const loanDate = new Date(loan.loanDate);
+      const matchesLoanDateFrom = !loanDateFrom || loanDate >= new Date(loanDateFrom);
+      const matchesLoanDateTo = !loanDateTo || loanDate <= new Date(loanDateTo + "T23:59:59");
+
+      // Filtro de data de devolução prevista
+      const dueDate = new Date(loan.dueDate);
+      const matchesDueDateFrom = !dueDateFrom || dueDate >= new Date(dueDateFrom);
+      const matchesDueDateTo = !dueDateTo || dueDate <= new Date(dueDateTo + "T23:59:59");
+
+      // Filtro de status
+      let matchesStatus = true;
+      if (statusFilter) {
+        if (statusFilter === "RETURNED") {
+          matchesStatus = !!loan.returnDate;
+        } else if (statusFilter === "OVERDUE") {
+          matchesStatus = !loan.returnDate && new Date(loan.dueDate) < new Date();
+        } else if (statusFilter === "ACTIVE") {
+          matchesStatus = !loan.returnDate && new Date(loan.dueDate) >= new Date();
+        }
+      }
+
+      return matchesSearch && matchesLoanDateFrom && matchesLoanDateTo &&
+             matchesDueDateFrom && matchesDueDateTo && matchesStatus;
+    });
+  }, [loans, searchTerm, loanDateFrom, loanDateTo, dueDateFrom, dueDateTo, statusFilter]);
+
   const handleReturn = async (id: string) => {
-    if (!confirm('Confirmar devolução do livro?')) return;
+    if (!confirm("Confirmar devolução do livro?")) return;
 
     try {
       const res = await fetch(`/api/loans/${id}/return`, {
-        method: 'POST', // Or PUT, depending on API implementation. Usually PUT for updates.
-        // Checking api/loans/[id]/return/route.ts... wait, the structure showed `api/loans/[id]/return`.
-        // Let's assume it's a POST or PUT to that endpoint.
-        // I'll check the API implementation if I can, but standard is often POST for actions.
-        // Let's try POST.
+        method: "POST",
       });
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Falha ao devolver livro');
+        throw new Error(data.error || "Falha ao devolver livro");
       }
-      
-      // Refresh list
+
       fetchLoans();
     } catch (err: any) {
       alert(err.message);
     }
   };
 
-  if (status === 'loading' || loading) return <div className="container">Carregando...</div>;
+  const clearFilters = () => {
+    setSearchTerm("");
+    setLoanDateFrom("");
+    setLoanDateTo("");
+    setDueDateFrom("");
+    setDueDateTo("");
+    setStatusFilter("");
+  };
+
+  const hasActiveFilters = searchTerm || loanDateFrom || loanDateTo || dueDateFrom || dueDateTo || statusFilter;
+
+  if (status === "loading" || loading) {
+    return <LoadingState message="Carregando empréstimos..." />;
+  }
 
   return (
-    <div className="container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1>Gerenciamento de Empréstimos</h1>
-        <Link href="/loans/new" className="btn btn-primary">
-          Novo Empréstimo
-        </Link>
+    <div>
+      <PageHeader
+        title="Gerenciamento de Empréstimos"
+        actionLabel="Novo Empréstimo"
+        actionHref="/loans/new"
+      />
+
+      {error && <div className="alert alert-error">{error}</div>}
+
+      <div className="filter-card">
+        <div className="flex flex-col gap-1">
+          {/* Primeira linha: pesquisa e status */}
+          <div className="filter-row">
+            <input
+              type="text"
+              placeholder="Pesquisar por livro ou aluno..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input"
+              style={{ maxWidth: '300px' }}
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="input"
+              style={{ maxWidth: '180px' }}
+            >
+              <option value="">Todos os status</option>
+              <option value="ACTIVE">Em andamento</option>
+              <option value="OVERDUE">Atrasado</option>
+              <option value="RETURNED">Devolvido</option>
+            </select>
+          </div>
+
+          {/* Segunda linha: datas de empréstimo */}
+          <div className="filter-row">
+            <span className="filter-label">Data Empréstimo:</span>
+            <input
+              type="date"
+              value={loanDateFrom}
+              onChange={(e) => setLoanDateFrom(e.target.value)}
+              className="input"
+              style={{ maxWidth: '160px' }}
+            />
+            <span className="filter-separator">até</span>
+            <input
+              type="date"
+              value={loanDateTo}
+              onChange={(e) => setLoanDateTo(e.target.value)}
+              className="input"
+              style={{ maxWidth: '160px' }}
+            />
+          </div>
+
+          {/* Terceira linha: datas de devolução */}
+          <div className="filter-row">
+            <span className="filter-label">Devolução Prevista:</span>
+            <input
+              type="date"
+              value={dueDateFrom}
+              onChange={(e) => setDueDateFrom(e.target.value)}
+              className="input"
+              style={{ maxWidth: '160px' }}
+            />
+            <span className="filter-separator">até</span>
+            <input
+              type="date"
+              value={dueDateTo}
+              onChange={(e) => setDueDateTo(e.target.value)}
+              className="input"
+              style={{ maxWidth: '160px' }}
+            />
+          </div>
+
+          {/* Contador e limpar filtros */}
+          {hasActiveFilters && (
+            <div className="filter-row">
+              <span className="filter-count">
+                {filteredLoans.length} de {loans.length} empréstimos
+              </span>
+              <button
+                onClick={clearFilters}
+                className="btn btn-secondary btn-sm"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-
-      <div className="card-grid" style={{ gridTemplateColumns: '1fr' }}> {/* List view style */}
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="table-container">
+        <table className="table">
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid #eee' }}>
-              <th style={{ padding: '1rem' }}>Livro</th>
-              <th style={{ padding: '1rem' }}>Aluno</th>
-              <th style={{ padding: '1rem' }}>Data Empréstimo</th>
-              <th style={{ padding: '1rem' }}>Data Devolução Prevista</th>
-              <th style={{ padding: '1rem' }}>Status</th>
-              <th style={{ padding: '1rem' }}>Ações</th>
+            <tr>
+              <th>Livro</th>
+              <th>Aluno</th>
+              <th>Data Empréstimo</th>
+              <th>Devolução Prevista</th>
+              <th>Status</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {loans.map((loan) => (
-              <tr key={loan.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '1rem' }}>{loan.book.title}</td>
-                <td style={{ padding: '1rem' }}>{loan.user.name}</td>
-                <td style={{ padding: '1rem' }}>{new Date(loan.loanDate).toLocaleDateString('pt-BR')}</td>
-                <td style={{ padding: '1rem' }}>{new Date(loan.dueDate).toLocaleDateString('pt-BR')}</td>
-                <td style={{ padding: '1rem' }}>
-                  <span style={{
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '4px',
-                    backgroundColor: loan.returnDate ? '#d4edda' : (new Date(loan.dueDate) < new Date() ? '#f8d7da' : '#fff3cd'),
-                    color: loan.returnDate ? '#155724' : (new Date(loan.dueDate) < new Date() ? '#721c24' : '#856404'),
-                    fontSize: '0.875rem'
-                  }}>
-                    {loan.returnDate ? 'Devolvido' : (new Date(loan.dueDate) < new Date() ? 'Atrasado' : 'Em andamento')}
-                  </span>
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  {!loan.returnDate && (
-                    <button 
-                      onClick={() => handleReturn(loan.id)}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
-                    >
-                      Devolver
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {loans.length === 0 && (
+            {filteredLoans.length > 0 ? (
+              filteredLoans.map((loan) => (
+                <tr key={loan.id}>
+                  <td>{loan.book.title}</td>
+                  <td>{loan.user.name}</td>
+                  <td>{new Date(loan.loanDate).toLocaleDateString("pt-BR")}</td>
+                  <td>{new Date(loan.dueDate).toLocaleDateString("pt-BR")}</td>
+                  <td>
+                    <StatusBadge returnDate={loan.returnDate} dueDate={loan.dueDate} />
+                  </td>
+                  <td>
+                    {!loan.returnDate && (
+                      <button
+                        onClick={() => handleReturn(loan.id)}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Devolver
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            ) : (
               <tr>
-                <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
-                  Nenhum empréstimo encontrado.
+                <td colSpan={6}>
+                  <EmptyState
+                    icon="📚"
+                    message="Nenhum empréstimo cadastrado."
+                    filteredMessage="Nenhum empréstimo encontrado com os filtros aplicados."
+                    hasFilters={!!hasActiveFilters}
+                  />
                 </td>
               </tr>
             )}

@@ -12,7 +12,7 @@ function Header() {
   const isStudent = session?.user?.role === 'ALUNO';
 
   if (pathname === '/login') {
-    return null; // Don't show header on login page
+    return null; 
   }
 
   return (
