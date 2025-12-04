@@ -21,7 +21,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (user && await bcrypt.compare(credentials.password, user.password)) {
-          // Retorna o objeto do usuário sem a senha
+          
           return {
             id: user.id,
             name: user.name,
@@ -36,7 +36,7 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // Ao fazer login, o objeto 'user' é passado e podemos adicionar dados ao token
+      
       if (user) {
         token.id = user.id;
         token.role = user.role;
@@ -44,7 +44,7 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // Adiciona os dados do token (id e role) ao objeto da sessão
+      
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
@@ -53,7 +53,7 @@ export const authOptions: NextAuthOptions = {
     }
   },
   pages: {
-    signIn: '/login', // Página de login personalizada
+    signIn: '/login', 
   },
   session: {
     strategy: 'jwt',
