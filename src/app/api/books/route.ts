@@ -4,10 +4,10 @@ import { getToken } from 'next-auth/jwt';
 
 const secret = process.env.NEXTAUTH_SECRET;
 
-// GET /api/books - List all books
+
 export async function GET(request: NextRequest) {
   const token = await getToken({ req: request, secret });
-  // Any authenticated user can view the book list.
+  
   if (!token) {
     return new NextResponse(
       JSON.stringify({ error: 'Acesso não autorizado' }),
@@ -31,11 +31,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/books - Create a new book
+
 export async function POST(request: NextRequest) {
   const token = await getToken({ req: request, secret });
 
-  // Authorization: Only ADMIN or BIBLIOTECARIO can create books.
+  
   if (!token || (token.role !== 'ADMIN' && token.role !== 'BIBLIOTECARIO')) {
     return new NextResponse(
       JSON.stringify({ error: 'Acesso proibido' }),
@@ -46,9 +46,8 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
 
-    // Validate required fields
-    if (!data?.title || !data?.author || !data?.isbn) {
-      return new NextResponse(JSON.stringify({ error: 'Título, autor e ISBN são obrigatórios' }), { status: 400 });
+    if (!data?.title || !data?.author ) {
+      return new NextResponse(JSON.stringify({ error: 'Título, autor' }), { status: 400 });
     }
     
     const existingBook = await prisma.book.findUnique({
@@ -64,7 +63,7 @@ export async function POST(request: NextRequest) {
         return new NextResponse(JSON.stringify({ error: 'Quantidade inválida' }), { status: 400 });
     }
 
-    // When creating a book, 'available' should default to the total 'quantity'
+    
     const newBook = await prisma.book.create({
       data: {
         title: data.title,

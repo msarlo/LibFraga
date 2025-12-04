@@ -1,16 +1,11 @@
-// Re-export Prisma types
-import { Prisma } from '@/generated/prisma';
-export type { User, Book, Loan, Fine } from '@/generated/prisma';
-// export type UserRole = Prisma.UserRole;
-// export type LoanStatus = Prisma.LoanStatus;
+import { Prisma } from "@/generated/prisma";
+export type { User, Book, Loan, Fine } from "@/generated/prisma";
 
-
-// Additional custom types can be added here
 export interface CreateUserDTO {
   name: string;
   email: string;
   password: string;
-  role: 'ADMIN' | 'BIBLIOTECARIO' | 'ALUNO';
+  role: "ADMIN" | "BIBLIOTECARIO" | "ALUNO";
 }
 
 export interface CreateBookDTO {

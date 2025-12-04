@@ -54,11 +54,11 @@ export default function NewLoanPage() {
         const usersData = await usersRes.json();
         const booksData = await booksRes.json();
 
-        // Filter only students (ALUNO) and available books
+        
         setUsers(usersData.filter((u: User) => u.role === 'ALUNO'));
         setBooks(booksData.filter((b: Book) => b.available > 0));
         
-        // Set default due date to 7 days from now
+        
         const nextWeek = new Date();
         nextWeek.setDate(nextWeek.getDate() + 7);
         setFormData(prev => ({ ...prev, dueDate: nextWeek.toISOString().split('T')[0] }));

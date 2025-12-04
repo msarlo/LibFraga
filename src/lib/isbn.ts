@@ -31,3 +31,36 @@ export function isValidIsbn(isbn: string): boolean {
     if (cleaned.length === 10) return isValidIsbn10(isbn);
     return false;
 }
+
+export function generateIsbn13(): string {
+  const prefixo = "171";
+  const noveDigitos = Array.from({ length: 9 }, () =>
+    Math.floor(Math.random() * 10)
+  ).join("");
+
+  const isbn12 = prefixo + noveDigitos;
+
+  const sum = isbn12.split("").reduce((acc, digit, index) => {
+    const num = parseInt(digit, 10);
+
+    const peso = index % 2 === 0 ? 1 : 3;
+    return acc + num * peso;
+  }, 0);
+
+  const checkDigit = (10 - (sum % 10)) % 10;
+
+  const isbn13Completo = isbn12 + checkDigit;
+
+  const formattedIsbn =
+    isbn13Completo.substring(0, 3) +
+    "-" +
+    isbn13Completo.substring(3, 4) +
+    "-" +
+    isbn13Completo.substring(4, 6) +
+    "-" +
+    isbn13Completo.substring(6, 12) +
+    "-" +
+    isbn13Completo.substring(12);
+
+  return formattedIsbn;
+}
