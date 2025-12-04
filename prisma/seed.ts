@@ -1,9 +1,13 @@
 import { PrismaClient } from '../src/generated/prisma'
+import bcrypt from 'bcryptjs'
+import path from 'path'
+
+const dbPath = path.resolve(__dirname, 'dev.db')
 
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: 'file:/home/sarlo/libFraga/LibFraga/prisma/dev.db'
+      url: `file:${dbPath}`
     }
   }
 })
@@ -14,14 +18,16 @@ async function main() {
   await prisma.user.deleteMany()
   console.log('Usuários anteriores removidos')
 
+  const hashedPassword = await bcrypt.hash('123456', 10)
+
   await prisma.user.create({
-    data: { name: 'Administrador', email: 'admin@teste.com', password: '123456', role: 'admin' }
+    data: { name: 'Administrador', email: 'admin@teste.com', password: hashedPassword, role: 'ADMIN' }
   })
   await prisma.user.create({
-    data: { name: 'Bibliotecário', email: 'bibliotecario@teste.com', password: '123456', role: 'bibliotecario' }
+    data: { name: 'Bibliotecário', email: 'bibliotecario@teste.com', password: hashedPassword, role: 'BIBLIOTECARIO' }
   })
   await prisma.user.create({
-    data: { name: 'Aluno Teste', email: 'aluno@teste.com', password: '123456', role: 'aluno' }
+    data: { name: 'Aluno Teste', email: 'aluno@teste.com', password: hashedPassword, role: 'ALUNO' }
   })
 
   console.log('3 usuários criados:')

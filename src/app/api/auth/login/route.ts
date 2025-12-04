@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
     try {
@@ -9,7 +10,14 @@ export async function POST(request: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user || user.password !== password) {
+        
+        if (!user) {
+            return new NextResponse(JSON.stringify({ error: 'Credenciais inválidas' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        const isValid = await bcrypt.compare(password, user.password);
+
+        if (!isValid) {
             return new NextResponse(JSON.stringify({ error: 'Credenciais inválidas' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
         }
 

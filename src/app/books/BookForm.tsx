@@ -2,8 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Book } from '../../generated/prisma/client';
+import { useSession } from 'next-auth/react';
 import { isValidIsbn } from '@/lib/isbn';
+
+type Book = {
+  id: string;
+  title: string;
+  author: string;
+  isbn: string;
+  quantity: number;
+  available: number;
+};
 
 type BookFormProps = {
   book?: Book;
@@ -11,6 +20,8 @@ type BookFormProps = {
 
 export default function BookForm({ book }: BookFormProps) {
   const router = useRouter();
+  const { data: session, status } = useSession();
+  
   const [formData, setFormData] = useState({
     title: '',
     author: '',
@@ -23,12 +34,23 @@ export default function BookForm({ book }: BookFormProps) {
   const isEditMode = Boolean(book);
 
   useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    } else if (status === 'authenticated') {
+      const role = session?.user?.role;
+      if (role !== 'ADMIN' && role !== 'BIBLIOTECARIO') {
+        router.push('/books'); // Redirect unauthorized users
+      }
+    }
+  }, [status, session, router]);
+
+  useEffect(() => {
     if (isEditMode && book) {
       setFormData({
         title: book.title,
         author: book.author,
         quantity: book.quantity,
-        isbn: (book as any).isbn ?? '',
+        isbn: book.isbn ?? '',
       });
     }
   }, [isEditMode, book]);
@@ -45,12 +67,13 @@ export default function BookForm({ book }: BookFormProps) {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    // Validate ISBN only if provided; backend will generate one otherwise
+    
     if (formData.isbn && !isValidIsbn(formData.isbn)) {
       setError('ISBN inválido. Use ISBN-10 ou ISBN-13 válidos, ou deixe em branco para gerar automaticamente.');
       setIsLoading(false);
       return;
     }
+    
     const apiEndpoint = isEditMode ? `/api/books/${book?.id}` : '/api/books';
     const method = isEditMode ? 'PUT' : 'POST';
 
@@ -68,15 +91,16 @@ export default function BookForm({ book }: BookFormProps) {
         throw new Error(errorData.error || 'Algo deu errado');
       }
 
-      // Redirect to the books list on success
       router.push('/books');
-      router.refresh(); // Ensure the list is updated
+      router.refresh();
     } catch (err: any) {
       setError(err.message);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (status === 'loading') return <p>Carregando...</p>;
 
   return (
     <div className="form-container">
@@ -146,3 +170,4 @@ export default function BookForm({ book }: BookFormProps) {
     </div>
   );
 }
+

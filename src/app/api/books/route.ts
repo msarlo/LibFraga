@@ -1,20 +1,31 @@
 import { prisma } from '@/lib/prisma';
-import { isValidIsbn } from '@/lib/isbn';
-import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-export const runtime = 'nodejs';
+const secret = process.env.NEXTAUTH_SECRET;
 
 // GET /api/books - List all books
 export async function GET(request: NextRequest) {
-  // TODO: Add authentication (any logged-in user can view books)
+  const token = await getToken({ req: request, secret });
+  // Any authenticated user can view the book list.
+  if (!token) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Acesso não autorizado' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
-    const books = await prisma.book.findMany();
+    const books = await prisma.book.findMany({
+      orderBy: {
+        title: 'asc'
+      }
+    });
     return NextResponse.json(books);
   } catch (error) {
     console.error(error);
     return new NextResponse(
-      JSON.stringify({ error: 'Failed to fetch books' }),
+      JSON.stringify({ error: 'Falha ao buscar os livros' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
@@ -22,26 +33,35 @@ export async function GET(request: NextRequest) {
 
 // POST /api/books - Create a new book
 export async function POST(request: NextRequest) {
-  // TODO: Add authentication and authorization (ADMIN or BIBLIOTECARIO)
-  // TODO: Add input validation using a DTO
+  const token = await getToken({ req: request, secret });
+
+  // Authorization: Only ADMIN or BIBLIOTECARIO can create books.
+  if (!token || (token.role !== 'ADMIN' && token.role !== 'BIBLIOTECARIO')) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Acesso proibido' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const data = await request.json();
 
     // Validate required fields
-    if (!data?.title || !data?.author) {
-      return new NextResponse(JSON.stringify({ error: 'Título e autor são obrigatórios' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (!data?.title || !data?.author || !data?.isbn) {
+      return new NextResponse(JSON.stringify({ error: 'Título, autor e ISBN são obrigatórios' }), { status: 400 });
+    }
+    
+    const existingBook = await prisma.book.findUnique({
+        where: { isbn: data.isbn },
+    });
+
+    if (existingBook) {
+        return new NextResponse(JSON.stringify({ error: 'Um livro com este ISBN já existe' }), { status: 409 });
     }
 
-    // If ISBN is provided and valid, use it. Otherwise generate an ISBN placeholder.
-    let isbn = data?.isbn;
-    if (isbn) {
-      if (!isValidIsbn(isbn)) {
-        // Provided ISBN is invalid — generate fallback using UUID instead of timestamp
-        isbn = `ISBN-${randomUUID()}`;
-      }
-    } else {
-      // No ISBN provided — generate fallback using UUID
-      isbn = `ISBN-${randomUUID()}`;
+    const quantity = data.quantity ? parseInt(data.quantity, 10) : 1;
+    if (isNaN(quantity) || quantity < 0) {
+        return new NextResponse(JSON.stringify({ error: 'Quantidade inválida' }), { status: 400 });
     }
 
     // When creating a book, 'available' should default to the total 'quantity'
@@ -49,16 +69,16 @@ export async function POST(request: NextRequest) {
       data: {
         title: data.title,
         author: data.author,
-        isbn,
-        quantity: data.quantity ?? 1,
-        available: data.quantity ?? 1,
+        isbn: data.isbn,
+        quantity: quantity,
+        available: quantity,
       },
     });
     return NextResponse.json(newBook, { status: 201 });
   } catch (error) {
     console.error(error);
     return new NextResponse(
-      JSON.stringify({ error: 'Failed to create book' }),
+      JSON.stringify({ error: 'Falha ao criar o livro' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
