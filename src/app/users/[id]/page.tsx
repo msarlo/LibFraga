@@ -3,6 +3,10 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import StatusBadge from "../../components/StatusBadge";
+import RoleBadge from "../../components/RoleBadge";
+import LoadingState from "../../components/LoadingState";
+import EmptyState from "../../components/EmptyState";
 
 interface Fine {
   id: string;
@@ -26,27 +30,6 @@ interface User {
   name: string;
   email: string;
   role: string;
-}
-
-function getStatusBadge(loan: Loan) {
-  if (loan.returnDate) {
-    return <span className="badge badge-success">Devolvido</span>;
-  }
-  if (new Date(loan.dueDate) < new Date()) {
-    return <span className="badge badge-danger">Atrasado</span>;
-  }
-  return <span className="badge badge-warning">Em andamento</span>;
-}
-
-function getRoleBadge(role: string) {
-  switch (role) {
-    case "ADMIN":
-      return <span className="badge badge-danger">Administrador</span>;
-    case "BIBLIOTECARIO":
-      return <span className="badge badge-info">Bibliotecário</span>;
-    default:
-      return <span className="badge badge-success">Aluno</span>;
-  }
 }
 
 export default function UserProfilePage({
@@ -122,31 +105,26 @@ export default function UserProfilePage({
   };
 
   if (status === "loading" || loading) {
-    return (
-      <div className="loading">
-        <div className="loading-spinner"></div>
-        <span>Carregando perfil...</span>
-      </div>
-    );
+    return <LoadingState message="Carregando perfil..." />;
   }
 
   if (!user) {
     return (
-      <div className="empty-state">
-        <div className="empty-state-icon">👤</div>
-        <p>Usuário não encontrado</p>
-      </div>
+      <EmptyState
+        icon="👤"
+        message="Usuário não encontrado"
+      />
     );
   }
 
   return (
     <div>
-      <div className="card mb-4">
+      <div className="card mb-3">
         <h1 className="mb-2">Perfil do Usuário</h1>
         <div className="flex flex-col gap-1">
           <p><strong>Nome:</strong> {user.name}</p>
           <p><strong>Email:</strong> {user.email}</p>
-          <p><strong>Função:</strong> {getRoleBadge(user.role)}</p>
+          <p><strong>Função:</strong> <RoleBadge role={user.role} /></p>
         </div>
       </div>
 
@@ -177,7 +155,9 @@ export default function UserProfilePage({
                       ? new Date(loan.returnDate).toLocaleDateString("pt-BR")
                       : new Date(loan.dueDate).toLocaleDateString("pt-BR") + " (Prevista)"}
                   </td>
-                  <td>{getStatusBadge(loan)}</td>
+                  <td>
+                    <StatusBadge returnDate={loan.returnDate} dueDate={loan.dueDate} />
+                  </td>
                   <td>
                     {loan.fine ? (
                       <span className={loan.fine.paid ? "text-success" : "text-danger"}>
@@ -205,10 +185,10 @@ export default function UserProfilePage({
             ) : (
               <tr>
                 <td colSpan={6}>
-                  <div className="empty-state">
-                    <div className="empty-state-icon">📚</div>
-                    <p>Nenhum histórico de empréstimos encontrado.</p>
-                  </div>
+                  <EmptyState
+                    icon="📚"
+                    message="Nenhum histórico de empréstimos encontrado."
+                  />
                 </td>
               </tr>
             )}

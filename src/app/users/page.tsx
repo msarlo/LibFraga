@@ -4,6 +4,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import RoleBadge from '../components/RoleBadge';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
 
 type User = {
     id: string;
@@ -11,17 +15,6 @@ type User = {
     email: string;
     role: string;
 };
-
-function getRoleBadge(role: string) {
-    switch (role) {
-        case "ADMIN":
-            return <span className="badge badge-danger">Administrador</span>;
-        case "BIBLIOTECARIO":
-            return <span className="badge badge-info">Bibliotecário</span>;
-        default:
-            return <span className="badge badge-success">Aluno</span>;
-    }
-}
 
 export default function UsersPage() {
     const { data: session, status } = useSession();
@@ -84,13 +77,15 @@ export default function UsersPage() {
         }
     };
 
+    const clearFilters = () => {
+        setSearchTerm('');
+        setRoleFilter('');
+    };
+
+    const hasActiveFilters = searchTerm || roleFilter;
+
     if (status === 'loading' || loading) {
-        return (
-            <div className="loading">
-                <div className="loading-spinner"></div>
-                <span>Carregando usuários...</span>
-            </div>
-        );
+        return <LoadingState message="Carregando usuários..." />;
     }
 
     if (error) {
@@ -101,17 +96,15 @@ export default function UsersPage() {
 
     return (
         <div>
-            <div className="page-header">
-                <h2>Gerenciamento de Usuários</h2>
-                {isAdmin && (
-                    <Link href="/users/register" className="btn btn-primary">
-                        Novo Usuário
-                    </Link>
-                )}
-            </div>
+            <PageHeader
+                title="Gerenciamento de Usuários"
+                actionLabel="Novo Usuário"
+                actionHref="/users/register"
+                showAction={isAdmin}
+            />
 
-            <div className="card mb-3">
-                <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+            <div className="filter-card">
+                <div className="filter-row">
                     <input
                         type="text"
                         placeholder="Pesquisar por nome ou email..."
@@ -131,10 +124,18 @@ export default function UsersPage() {
                         <option value="BIBLIOTECARIO">Bibliotecário</option>
                         <option value="ALUNO">Aluno</option>
                     </select>
-                    {(searchTerm || roleFilter) && (
-                        <span className="text-muted">
-                            {filteredUsers.length} de {users.length} usuários
-                        </span>
+                    {hasActiveFilters && (
+                        <>
+                            <span className="filter-count">
+                                {filteredUsers.length} de {users.length} usuários
+                            </span>
+                            <button
+                                onClick={clearFilters}
+                                className="btn btn-secondary btn-sm"
+                            >
+                                Limpar filtros
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -154,12 +155,12 @@ export default function UsersPage() {
                             filteredUsers.map((u) => (
                                 <tr key={u.id}>
                                     <td>
-                                        <Link href={`/users/${u.id}`} style={{ textDecoration: 'none', color: 'inherit', fontWeight: 'bold' }}>
+                                        <Link href={`/users/${u.id}`} style={{ textDecoration: 'none', color: 'inherit', fontWeight: '600' }}>
                                             {u.name}
                                         </Link>
                                     </td>
                                     <td>{u.email}</td>
-                                    <td>{getRoleBadge(u.role)}</td>
+                                    <td><RoleBadge role={u.role} /></td>
                                     {isAdmin && (
                                         <td>
                                             <button
@@ -175,14 +176,12 @@ export default function UsersPage() {
                         ) : (
                             <tr>
                                 <td colSpan={isAdmin ? 4 : 3}>
-                                    <div className="empty-state">
-                                        <div className="empty-state-icon">👤</div>
-                                        <p>
-                                            {searchTerm || roleFilter
-                                                ? 'Nenhum usuário encontrado com os filtros aplicados.'
-                                                : 'Nenhum usuário cadastrado.'}
-                                        </p>
-                                    </div>
+                                    <EmptyState
+                                        icon="👤"
+                                        message="Nenhum usuário cadastrado."
+                                        filteredMessage="Nenhum usuário encontrado com os filtros aplicados."
+                                        hasFilters={!!hasActiveFilters}
+                                    />
                                 </td>
                             </tr>
                         )}

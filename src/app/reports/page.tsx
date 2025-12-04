@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { StatusBadgeByStatus } from '../components/StatusBadge';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
 
 interface OverdueLoan {
   id: string;
@@ -23,17 +26,6 @@ interface StudentHistory {
     returnDate: string | null;
     status: string;
   }[];
-}
-
-function getStatusBadge(status: string) {
-  switch (status) {
-    case 'RETURNED':
-      return <span className="badge badge-success">Devolvido</span>;
-    case 'OVERDUE':
-      return <span className="badge badge-danger">Atrasado</span>;
-    default:
-      return <span className="badge badge-info">Ativo</span>;
-  }
 }
 
 export default function ReportsPage() {
@@ -94,12 +86,7 @@ export default function ReportsPage() {
   };
 
   if (status === 'loading' || loading) {
-    return (
-      <div className="loading">
-        <div className="loading-spinner"></div>
-        <span>Carregando relatórios...</span>
-      </div>
-    );
+    return <LoadingState message="Carregando relatórios..." />;
   }
 
   return (
@@ -114,12 +101,12 @@ export default function ReportsPage() {
         <div className="card">
           <h2 className="mb-2">Livros em Atraso (Pendências)</h2>
           {overdueLoans.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">✓</div>
-              <p>Nenhuma pendência encontrada.</p>
-            </div>
+            <EmptyState
+              icon="✓"
+              message="Nenhuma pendência encontrada."
+            />
           ) : (
-            <div className="table-container">
+            <div className="table-container" style={{ boxShadow: 'none', border: 'none' }}>
               <table className="table">
                 <thead>
                   <tr>
@@ -163,10 +150,10 @@ export default function ReportsPage() {
           </div>
 
           {studentHistory.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">👤</div>
-              <p>Nenhum aluno encontrado.</p>
-            </div>
+            <EmptyState
+              icon="👤"
+              message="Nenhum aluno encontrado."
+            />
           ) : (
             <div className="flex flex-col gap-2">
               {studentHistory.map((student) => (
@@ -179,7 +166,7 @@ export default function ReportsPage() {
                   {student.loans.length === 0 ? (
                     <p className="text-muted" style={{ fontStyle: 'italic' }}>Nenhum empréstimo registrado.</p>
                   ) : (
-                    <div className="table-container">
+                    <div className="table-container" style={{ boxShadow: 'none', border: 'none' }}>
                       <table className="table">
                         <thead>
                           <tr>
@@ -195,7 +182,7 @@ export default function ReportsPage() {
                               <td>{loan.book.title}</td>
                               <td>{new Date(loan.loanDate).toLocaleDateString('pt-BR')}</td>
                               <td>{loan.returnDate ? new Date(loan.returnDate).toLocaleDateString('pt-BR') : '-'}</td>
-                              <td>{getStatusBadge(loan.status)}</td>
+                              <td><StatusBadgeByStatus status={loan.status} /></td>
                             </tr>
                           ))}
                         </tbody>

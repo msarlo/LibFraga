@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import BookActions from './BookActions';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
 
 type Book = {
   id: string;
@@ -55,28 +57,23 @@ export default function BooksPage() {
     );
   }, [books, searchTerm]);
 
+  const hasActiveFilters = !!searchTerm;
+
   if (loading) {
-    return (
-      <div className="loading">
-        <div className="loading-spinner"></div>
-        <span>Carregando livros...</span>
-      </div>
-    );
+    return <LoadingState message="Carregando livros..." />;
   }
 
   return (
     <div>
-      <div className="page-header">
-        <h2>Gerenciamento de Livros</h2>
-        {canManage && (
-          <Link href="/books/form" className="btn btn-primary">
-            Adicionar Livro
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        title="Gerenciamento de Livros"
+        actionLabel="Adicionar Livro"
+        actionHref="/books/form"
+        showAction={canManage}
+      />
 
-      <div className="card mb-3">
-        <div className="flex items-center gap-2">
+      <div className="filter-card">
+        <div className="filter-row">
           <input
             type="text"
             placeholder="Pesquisar por título ou autor..."
@@ -86,9 +83,17 @@ export default function BooksPage() {
             style={{ maxWidth: '400px' }}
           />
           {searchTerm && (
-            <span className="text-muted">
-              {filteredBooks.length} de {books.length} livros
-            </span>
+            <>
+              <span className="filter-count">
+                {filteredBooks.length} de {books.length} livros
+              </span>
+              <button
+                onClick={() => setSearchTerm('')}
+                className="btn btn-secondary btn-sm"
+              >
+                Limpar filtro
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -116,10 +121,9 @@ export default function BooksPage() {
           <tbody>
             {filteredBooks.length > 0 ? (
               filteredBooks.map((book) => (
-                <tr 
-                  key={book.id} 
+                <tr
+                  key={book.id}
                   className={book.available === 0 ? 'book-unavailable' : ''}
-                  style={book.available === 0 ? { opacity: 0.5, backgroundColor: '#f9f9f9' } : {}}
                 >
                   <td>{book.title}</td>
                   <td>{book.author}</td>
@@ -136,14 +140,12 @@ export default function BooksPage() {
             ) : (
               <tr>
                 <td colSpan={canManage ? 6 : 5}>
-                  <div className="empty-state">
-                    <div className="empty-state-icon">📚</div>
-                    <p>
-                      {searchTerm
-                        ? `Nenhum livro encontrado para "${searchTerm}"`
-                        : 'Nenhum livro cadastrado.'}
-                    </p>
-                  </div>
+                  <EmptyState
+                    icon="📚"
+                    message="Nenhum livro cadastrado."
+                    filteredMessage={`Nenhum livro encontrado para "${searchTerm}"`}
+                    hasFilters={hasActiveFilters}
+                  />
                 </td>
               </tr>
             )}
@@ -153,4 +155,3 @@ export default function BooksPage() {
     </div>
   );
 }
-

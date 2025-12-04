@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import StatusBadge from "../components/StatusBadge";
+import LoadingState from "../components/LoadingState";
+import EmptyState from "../components/EmptyState";
+import PageHeader from "../components/PageHeader";
 
 interface Loan {
   id: string;
@@ -13,16 +16,6 @@ interface Loan {
   dueDate: string;
   returnDate: string | null;
   status: string;
-}
-
-function getStatusBadge(loan: Loan) {
-  if (loan.returnDate) {
-    return <span className="badge badge-success">Devolvido</span>;
-  }
-  if (new Date(loan.dueDate) < new Date()) {
-    return <span className="badge badge-danger">Atrasado</span>;
-  }
-  return <span className="badge badge-warning">Em andamento</span>;
 }
 
 export default function LoansPage() {
@@ -134,29 +127,23 @@ export default function LoansPage() {
   const hasActiveFilters = searchTerm || loanDateFrom || loanDateTo || dueDateFrom || dueDateTo || statusFilter;
 
   if (status === "loading" || loading) {
-    return (
-      <div className="loading">
-        <div className="loading-spinner"></div>
-        <span>Carregando empréstimos...</span>
-      </div>
-    );
+    return <LoadingState message="Carregando empréstimos..." />;
   }
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Gerenciamento de Empréstimos</h1>
-        <Link href="/loans/new" className="btn btn-primary">
-          Novo Empréstimo
-        </Link>
-      </div>
+      <PageHeader
+        title="Gerenciamento de Empréstimos"
+        actionLabel="Novo Empréstimo"
+        actionHref="/loans/new"
+      />
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="card mb-3">
-        <div className="flex flex-col gap-2">
+      <div className="filter-card">
+        <div className="flex flex-col gap-1">
           {/* Primeira linha: pesquisa e status */}
-          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+          <div className="filter-row">
             <input
               type="text"
               placeholder="Pesquisar por livro ou aluno..."
@@ -179,8 +166,8 @@ export default function LoansPage() {
           </div>
 
           {/* Segunda linha: datas de empréstimo */}
-          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
-            <span className="text-muted" style={{ minWidth: '140px' }}>Data Empréstimo:</span>
+          <div className="filter-row">
+            <span className="filter-label">Data Empréstimo:</span>
             <input
               type="date"
               value={loanDateFrom}
@@ -188,7 +175,7 @@ export default function LoansPage() {
               className="input"
               style={{ maxWidth: '160px' }}
             />
-            <span className="text-muted">até</span>
+            <span className="filter-separator">até</span>
             <input
               type="date"
               value={loanDateTo}
@@ -199,8 +186,8 @@ export default function LoansPage() {
           </div>
 
           {/* Terceira linha: datas de devolução */}
-          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
-            <span className="text-muted" style={{ minWidth: '140px' }}>Devolução Prevista:</span>
+          <div className="filter-row">
+            <span className="filter-label">Devolução Prevista:</span>
             <input
               type="date"
               value={dueDateFrom}
@@ -208,7 +195,7 @@ export default function LoansPage() {
               className="input"
               style={{ maxWidth: '160px' }}
             />
-            <span className="text-muted">até</span>
+            <span className="filter-separator">até</span>
             <input
               type="date"
               value={dueDateTo}
@@ -220,8 +207,8 @@ export default function LoansPage() {
 
           {/* Contador e limpar filtros */}
           {hasActiveFilters && (
-            <div className="flex items-center gap-2">
-              <span className="text-muted">
+            <div className="filter-row">
+              <span className="filter-count">
                 {filteredLoans.length} de {loans.length} empréstimos
               </span>
               <button
@@ -255,7 +242,9 @@ export default function LoansPage() {
                   <td>{loan.user.name}</td>
                   <td>{new Date(loan.loanDate).toLocaleDateString("pt-BR")}</td>
                   <td>{new Date(loan.dueDate).toLocaleDateString("pt-BR")}</td>
-                  <td>{getStatusBadge(loan)}</td>
+                  <td>
+                    <StatusBadge returnDate={loan.returnDate} dueDate={loan.dueDate} />
+                  </td>
                   <td>
                     {!loan.returnDate && (
                       <button
@@ -271,14 +260,12 @@ export default function LoansPage() {
             ) : (
               <tr>
                 <td colSpan={6}>
-                  <div className="empty-state">
-                    <div className="empty-state-icon">📚</div>
-                    <p>
-                      {hasActiveFilters
-                        ? "Nenhum empréstimo encontrado com os filtros aplicados."
-                        : "Nenhum empréstimo cadastrado."}
-                    </p>
-                  </div>
+                  <EmptyState
+                    icon="📚"
+                    message="Nenhum empréstimo cadastrado."
+                    filteredMessage="Nenhum empréstimo encontrado com os filtros aplicados."
+                    hasFilters={!!hasActiveFilters}
+                  />
                 </td>
               </tr>
             )}
