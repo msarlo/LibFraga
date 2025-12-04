@@ -9,13 +9,16 @@
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "npx tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^4.16.2",
     "dotenv": "^17.2.3",
     "next": "^14.2.18",
-    "prisma": "^7.0.0",
     "prisma": "^4.16.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -24,8 +27,12 @@
     "@types/node": "^20.19.25",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.22",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.18",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.17",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }
